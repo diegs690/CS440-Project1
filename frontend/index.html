@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prototype UI</title>
+  </head>
+  <body>
+    <h1>Task Prototype</h1>
+
+    <form id="form">
+      <input id="title" placeholder="New task..." required />
+      <button>Add</button>
+    </form>
+
+    <ul id="list"></ul>
+
+    <script>
+      const API = "http://localhost:3001/api/tasks";
+
+      async function load() {
+        const res = await fetch(API);
+        const tasks = await res.json();
+        const list = document.getElementById("list");
+        list.innerHTML = "";
+        for (const t of tasks) {
+          const li = document.createElement("li");
+          li.textContent = (t.done ? "✅ " : "⬜ ") + t.title;
+          li.style.cursor = "pointer";
+          li.onclick = async () => {
+            await fetch(`${API}/${t.id}/toggle`, { method: "PATCH" });
+            load();
+          };
+          list.appendChild(li);
+        }
+      }
+
+      document.getElementById("form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const title = document.getElementById("title").value.trim();
+        if (!title) return;
+        await fetch(API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        document.getElementById("title").value = "";
+        load();
+      });
+
+      load();
+    </script>
+  </body>
+</html>
+
