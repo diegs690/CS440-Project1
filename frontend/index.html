@@ -3,36 +3,119 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Prototype UI</title>
+    <title>Collaborative Task Management System Prototype</title>
   </head>
   <body>
-    <h1>Task Prototype</h1>
+    <h1>Collaborative Task Management System Prototype</h1>
+    
+    <div id="stats">
+      <strong>Stats:</strong>
+      <span id="stats-text"></span>
+    </div>
 
     <form id="form">
       <input id="title" placeholder="New task..." required />
-      <button>Add</button>
+      <button type="submit">Add</button>
+      <input id="search" placeholder="Search tasks..." />
     </form>
+
+    <div id="filters">
+      <span>Filter:</span>
+      <button type="button" data-filter="all" class="filter-btn active">All</button>
+      <button type="button" data-filter="pending" class="filter-btn">Pending</button>
+      <button type="button" data-filter="completed" class="filter-btn">Completed</button>
+      <button type="button" id="complete-all">Complete all</button>
+      <button type="button" id="clear-completed">Clear completed</button>
+    </div>
 
     <ul id="list"></ul>
 
     <script>
       const API = "http://localhost:3001/api/tasks";
+      let currentFilter = "all";
 
       async function load() {
         const res = await fetch(API);
         const tasks = await res.json();
         const list = document.getElementById("list");
         list.innerHTML = "";
-        for (const t of tasks) {
+        const filtered = tasks.filter((t) => {
+          if (currentFilter === "pending") return !t.done;
+          if (currentFilter === "completed") return t.done;
+          return true;
+        });
+        for (const t of filtered) {
           const li = document.createElement("li");
-          li.textContent = (t.done ? "✅ " : "⬜ ") + t.title;
-          li.style.cursor = "pointer";
-          li.onclick = async () => {
+          li.dataset.id = t.id;
+          const checkbox = document.createElement("span");
+          checkbox.textContent = t.done ? "✅ " : "⬜ ";
+          checkbox.style.cursor = "pointer";
+          checkbox.onclick = async (e) => {
+            e.stopPropagation();
             await fetch(`${API}/${t.id}/toggle`, { method: "PATCH" });
             load();
           };
+          const label = document.createElement("span");
+          label.textContent = t.title;
+          label.style.marginRight = "8px";
+          const editBtn = document.createElement("button");
+          editBtn.type = "button";
+          editBtn.textContent = "Edit";
+          editBtn.onclick = (e) => {
+            e.stopPropagation();
+            editTask(t, label);
+          };
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.textContent = "Delete";
+          delBtn.onclick = async (e) => {
+            e.stopPropagation();
+            await fetch(`${API}/${t.id}`, { method: "DELETE" });
+            load();
+          };
+          li.append(checkbox, label, " ", editBtn, " ", delBtn);
           list.appendChild(li);
         }
+        // Load stats
+        const statsRes = await fetch(`${API}/stats`);
+        const stats = await statsRes.json();
+        document.getElementById("stats-text").textContent =
+          `Total: ${stats.total} | Pending: ${stats.pending} | Completed: ${stats.completed}`;
+      }
+
+      function editTask(t, labelEl) {
+        const input = document.createElement("input");
+        input.value = t.title;
+        input.type = "text";
+        input.size = Math.max(15, t.title.length);
+        const container = labelEl.parentElement;
+        const save = () => {
+          const newTitle = input.value.trim();
+          if (newTitle && newTitle !== t.title) {
+            fetch(`${API}/${t.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: newTitle }),
+            })
+              .then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+              .then(() => load())
+              .catch((err) => { console.error("Edit failed:", err); load(); });
+          } else {
+            labelEl.style.display = "";
+            input.remove();
+          }
+        };
+        input.onblur = save;
+        input.onkeydown = (e) => {
+          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Escape") {
+            labelEl.style.display = "";
+            input.remove();
+          }
+        };
+        labelEl.style.display = "none";
+        container.insertBefore(input, labelEl.nextSibling);
+        input.focus();
       }
 
       document.getElementById("form").addEventListener("submit", async (e) => {
@@ -48,6 +131,56 @@
         load();
       });
 
+      document.querySelectorAll(".filter-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentFilter = btn.dataset.filter;
+          document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          load();
+        });
+      });
+
+      document.getElementById("clear-completed").addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          const r = await fetch(`${API}/completed`, { method: "DELETE" });
+          if (!r.ok) throw new Error(r.statusText);
+          currentFilter = "all";
+          document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+          document.querySelector("[data-filter='all']").classList.add("active");
+          load();
+        } catch (err) {
+          console.error("Clear completed failed:", err);
+        }
+      });
+
+      document.getElementById("search").addEventListener("input", async (e) => {
+        const query = e.target.value.trim();
+        if (!query) {
+          load();
+          return;
+        }
+
+        const res = await fetch(`${API}/search/${query}`);
+        const tasks = await res.json();
+
+        const list = document.getElementById("list");
+        list.innerHTML = "";
+
+        for (const t of tasks) {
+          const li = document.createElement("li");
+          li.textContent = (t.done ? "✅ " : "⬜ ") + t.title;
+          list.appendChild(li);
+        }
+      });
+
+      document.getElementById("complete-all").addEventListener("click", async () => {
+      await fetch(`${API}/complete-all`, { method: "PATCH" });
+  load();
+});
+
+
+      
       load();
     </script>
   </body>
