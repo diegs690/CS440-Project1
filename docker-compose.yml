@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - TASK_SERVICE_URL=http://task-service:3001
+      - SEARCH_SERVICE_URL=http://search-service:3002
+      - STATS_SERVICE_URL=http://stats-service:3003
+    depends_on:
+      - task-service
+      - search-service
+      - stats-service
+
+  task-service:
+    build: ./task-service
+    ports:
+      - "3001:3001"
+    environment:
+      - SEARCH_SERVICE_URL=http://search-service:3002
+      - STATS_SERVICE_URL=http://stats-service:3003
+
+  search-service:
+    build: ./search-service
+    ports:
+      - "3002:3002"
+
+  stats-service:
+    build: ./stats-service
+    ports:
+      - "3003:3003"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway

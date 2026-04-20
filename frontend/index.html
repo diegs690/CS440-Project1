@@ -34,7 +34,7 @@
       <ul id="list"></ul>
 
       <script>
-        const API = "http://localhost:3001/api/tasks";
+        const API = "http://localhost:3000/api/tasks";
         let currentFilter = "all";
 
         async function load() {
@@ -79,7 +79,7 @@
             li.append(checkbox, label, " ", editBtn, " ", delBtn);
             list.appendChild(li);
           }
-          // Load stats
+
           const statsRes = await fetch(`${API}/stats`);
           const stats = await statsRes.json();
           document.getElementById("stats-text").textContent =
